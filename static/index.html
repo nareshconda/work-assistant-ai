@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Work Assistant AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#151b24; --panel-2:#1b2330; --line:#2a3442;
+    --text:#dbe4ee; --dim:#7d8b9d; --amber:#f0b429; --amber-dim:#8a6a1c;
+    --teal:#3ddc97; --red:#f4645f; --user:#233042;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --ui:'Space Grotesk',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--ui);
+    display:flex;flex-direction:column}
+
+  header{display:flex;align-items:center;gap:12px;padding:14px 22px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#121826,#0d1117);flex:0 0 auto}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--teal);
+    box-shadow:0 0 8px var(--teal);flex:0 0 auto}
+  .led.off{background:var(--red);box-shadow:0 0 8px var(--red)}
+  /* --- change the app title here --- */
+  header h1{font-size:15px;font-weight:600;letter-spacing:.06em}
+  header .sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:auto}
+
+  #chat{flex:1 1 auto;overflow-y:auto;padding:26px 0 12px;scroll-behavior:smooth}
+  .row{max-width:900px;margin:0 auto 16px;padding:0 22px;display:flex}
+  .bubble{padding:11px 15px;border-radius:10px;line-height:1.55;font-size:14.5px;
+    white-space:pre-wrap;word-break:break-word;max-width:78%}
+  .row.user{justify-content:flex-end}
+  .row.user .bubble{background:var(--user);border:1px solid #2f3f56;border-bottom-right-radius:3px}
+  .row.bot .bubble{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:3px}
+  .row.err .bubble{background:#2a1717;border:1px solid #5c2b2b;color:#f3b6b3}
+
+  /* rendered markdown in bot bubbles */
+  .bubble.md{white-space:normal}
+  .bubble.md.wide{max-width:100%}
+  .bubble.md .prose div{margin:0 0 2px}
+  .bubble.md .prose br{line-height:.6}
+  .bubble.md .prose:not(:first-child){margin-top:8px}
+  .bubble.md strong{color:#fff;font-weight:600}
+  .bubble.md em{color:#e6d8b8;font-style:italic}
+  .bubble.md code{font-family:var(--mono);font-size:12.5px;background:#0f141c;
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  .bubble.md ul,.bubble.md ol{margin:4px 0 6px;padding-left:22px}
+  .bubble.md li{margin:2px 0}
+
+  /* fenced code blocks with copy button */
+  .bubble.md .codeblock{margin:8px 0;border:1px solid var(--line);border-radius:8px;
+    overflow:hidden;background:#0f141c}
+  .bubble.md .cb-head{display:flex;align-items:center;justify-content:space-between;
+    padding:5px 10px;background:#10151d;border-bottom:1px solid var(--line)}
+  .bubble.md .cb-lang{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    color:var(--dim);text-transform:uppercase}
+  .bubble.md .cb-copy{background:var(--panel-2);color:var(--dim);
+    border:1px solid var(--line);border-radius:6px;font-family:var(--ui);
+    font-size:11px;font-weight:500;padding:3px 12px;cursor:pointer}
+  .bubble.md .cb-copy:hover{color:var(--text);border-color:var(--amber-dim)}
+  .bubble.md .cb-copy.copied{color:var(--teal);border-color:var(--teal)}
+  .bubble.md .codeblock pre{margin:0;padding:12px 14px;overflow-x:auto}
+  .bubble.md .codeblock code{font-family:var(--mono);font-size:12.5px;line-height:1.5;
+    color:#cdd8e5;white-space:pre;background:none;border:none;padding:0}
+
+  /* rendered tables (inside result bubbles) */
+  .tablewrap{overflow:auto;max-height:460px;border:1px solid var(--line);
+    border-radius:8px}
+  .tablewrap+.tablewrap{margin-top:8px}
+  .tw-bar{display:flex;align-items:center;justify-content:space-between;
+    padding:5px 10px;background:#10151d;border-bottom:1px solid var(--line)}
+  .tw-info{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+    letter-spacing:.05em}
+  .tw-save{background:var(--panel-2);color:var(--dim);border:1px solid var(--line);
+    border-radius:6px;font-family:var(--ui);font-size:11px;font-weight:500;
+    padding:3px 12px;cursor:pointer}
+  .tw-save:hover{color:var(--text);border-color:var(--amber-dim)}
+  table.grid{border-collapse:collapse;font-family:var(--mono);font-size:12px;width:100%}
+  table.grid th,table.grid td{border-bottom:1px solid var(--line);
+    border-right:1px solid var(--line);padding:6px 12px;text-align:left;white-space:nowrap}
+  table.grid th{background:#10151d;color:var(--amber);font-weight:600;position:sticky;top:0}
+  table.grid td{color:#cdd8e5}
+  table.grid td.num,table.grid th.num{text-align:right}
+  table.grid tbody tr:nth-child(even) td{background:#121925}
+  table.grid tbody tr:hover td{background:#1a2536}
+  table.grid th:last-child,table.grid td:last-child{border-right:none}
+  table.grid tbody tr:last-child td{border-bottom:none}
+
+  /* live console (job card) — collapsible */
+  .job{max-width:900px;margin:0 auto 16px;padding:0 22px}
+  .job-inner{border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    background:var(--panel-2)}
+  .job-head{display:flex;align-items:center;gap:10px;padding:8px 14px;
+    background:#10151d;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:12px;letter-spacing:.04em;user-select:none}
+  .job.collapsible .job-head{cursor:pointer}
+  .job.collapsed .job-inner{background:#10151d}
+  .job-head .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);
+    animation:pulse 1.1s infinite alternate}
+  .job.done .dot{background:var(--teal);animation:none;box-shadow:0 0 6px var(--teal)}
+  .job.fail .dot{background:var(--red);animation:none;box-shadow:0 0 6px var(--red)}
+  @keyframes pulse{from{opacity:.35}to{opacity:1}}
+  .job-head .name{color:var(--amber)}
+  .job.done .name{color:var(--teal)}
+  .job.fail .name{color:var(--red)}
+  .job-head .state{color:var(--dim)}
+  .job-head .job-stop{background:#241a1a;color:#f0a9a5;border:1px solid #5c2b2b;
+    border-radius:6px;font-family:var(--ui);font-size:11px;font-weight:500;
+    padding:2px 10px;cursor:pointer;margin-left:auto}
+  .job-head .job-stop:hover{color:#fff;border-color:var(--red)}
+  .job-head .job-stop:disabled{opacity:.5;cursor:default}
+  .job-head .job-stop + .toggle{margin-left:0}
+  .job-head .toggle{color:var(--dim);font-size:11px;display:none}
+  .job.collapsible .job-head .toggle{display:inline}
+  .job.collapsed .job-body{display:none}
+  .tool-sec{border-top:1px solid var(--line)}
+  .tool-sec:first-child{border-top:none}
+  .sec-head{display:flex;align-items:center;gap:8px;padding:6px 14px;
+    background:#0f141c;font-family:var(--mono);font-size:11px;color:var(--dim);
+    letter-spacing:.03em}
+  .sec-head .sec-status{margin-left:auto}
+  .tool-sec.ok .sec-status{color:var(--teal)}
+  .tool-sec.fail .sec-status{color:var(--red)}
+  .job-body pre{font-family:var(--mono);font-size:12.5px;line-height:1.5;
+    padding:12px 14px;overflow-x:auto;color:#c7d3e0;max-height:420px;
+    overflow-y:auto;white-space:pre}
+  .job-body pre:empty{display:none}
+  .qline{color:var(--amber)}
+  .aline{color:var(--teal)}
+
+  .thinking{font-family:var(--mono);font-size:12px;color:var(--dim);
+    max-width:900px;margin:0 auto 14px;padding:0 22px}
+  .thinking::after{content:'▋';animation:blink 1s steps(1) infinite;color:var(--amber)}
+  @keyframes blink{50%{opacity:0}}
+
+  #awaitBanner{display:none;max-width:900px;margin:0 auto;padding:6px 22px;
+    font-family:var(--mono);font-size:11.5px;color:var(--amber)}
+
+  header h1 .mark{color:var(--amber);margin-right:2px;font-size:13px}
+  .header-logo {
+    height: 1.2em; 
+    vertical-align: middle; 
+    margin-right: 12px;
+  }  
+  
+  footer{flex:0 0 auto;border-top:1px solid var(--line);
+    padding:14px 22px 18px;background:#0f141c}
+  .inputwrap{max-width:900px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+  #msg{flex:1;resize:none;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;color:var(--text);font-family:var(--ui);font-size:14.5px;
+    padding:11px 14px;min-height:46px;max-height:160px;outline:none}
+  #msg:focus{border-color:var(--text)}
+  button{background:var(--text);border:none;border-radius:10px;color:#141414;
+    font-family:var(--ui);font-weight:600;font-size:14px;padding:12px 18px;cursor:pointer}
+  button:disabled{opacity:.4;cursor:default}
+  #attach{background:var(--panel);color:var(--dim);border:1px solid var(--line);
+    padding:12px 14px;font-size:16px;line-height:1}
+  #attach:hover{color:var(--text)}
+  .filechip{max-width:900px;margin:6px auto 0;padding:0 22px;
+    font-family:var(--mono);font-size:11.5px;color:var(--teal)}
+
+  /* ---------- credential prompt (passcodes) ----------------------------
+     Deliberately quiet: same panel/line/radius as a bot bubble, mono label,
+     amber used only as a small accent. It should read as part of the chat,
+     not as a modal shouting at you. */
+  .credcard{max-width:900px;margin:0 auto 14px;padding:0 22px;
+    animation:ccIn .18s ease-out}
+  @keyframes ccIn{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+  .credcard.gone{opacity:0;transition:opacity .25s ease}
+  .cc-in{background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px}
+  .cc-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .cc-lock{font-size:11px;color:var(--amber);opacity:.9}
+  .cc-title{font-family:var(--mono);font-size:11.5px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--text);opacity:.85}
+  .cc-tag{margin-left:auto;font-family:var(--mono);font-size:9.5px;
+    letter-spacing:.09em;color:var(--dim);border:1px solid var(--line);
+    border-radius:999px;padding:2px 8px}
+  .cc-prompt{font-family:var(--mono);font-size:12px;color:var(--dim);
+    margin-bottom:9px;white-space:pre-wrap}
+  .cc-row{display:flex;align-items:center;gap:8px}
+  .cc-row input{flex:1 1 auto;background:#0f141c;border:1px solid var(--line);
+    border-radius:7px;color:var(--text);font-family:var(--mono);font-size:13px;
+    letter-spacing:.2em;padding:9px 11px;outline:none}
+  .cc-row input:focus{border-color:var(--amber-dim)}
+  .cc-eye,.cc-go{background:#0f141c;border:1px solid var(--line);
+    border-radius:7px;color:var(--dim);font-family:var(--ui);font-size:12px;
+    padding:9px 12px;cursor:pointer;line-height:1}
+  .cc-go{color:var(--amber);min-width:70px;font-weight:500}
+  .cc-go:hover,.cc-eye:hover{border-color:#3a4758;color:var(--text)}
+  .cc-note{font-family:var(--mono);font-size:10.5px;color:#5f6b7c;margin-top:9px}
+  .cc-done{display:flex;align-items:center;gap:9px;font-family:var(--mono);
+    font-size:11.5px;color:var(--dim)}
+  .cc-done .tick{color:var(--teal)}
+
+  @media (max-width:640px){ .bubble{max-width:92%} }
+
+</style>
+</head>
+<body>
+
+<header>
+  <!-- <div class="led off" id="connLed"></div> -->
+  <h1>
+            <span class="mark">&#9632;</span> Work Assistant AI
+  </h1>
+  <!-- <div class="sub" id="backendLabel">chat console</div> -->
+  <div class="sub" id="backendLabel">connecting…</div>
+</header>
+
+<div id="chat"></div>
+<div id="awaitBanner">▲ a running job is waiting for your answer — type it below</div>
+
+<footer>
+  <div class="inputwrap">
+    <button id="attach" title="Attach a file">📄</button>
+    <input type="file" id="fileInput" hidden>
+    <textarea id="msg" rows="1"
+      placeholder="Ask anything…"></textarea>
+    <button id="send">Send</button>
+  </div>
+  <div class="filechip" id="fileChip"></div>
+</footer>
+
+<script>
+console.log('%cWork Assistant AI', 'color:#3ddc97');
+const chat = document.getElementById('chat');
+const msgBox = document.getElementById('msg');
+const sendBtn = document.getElementById('send');
+const attachBtn = document.getElementById('attach');
+const fileInput = document.getElementById('fileInput');
+const fileChip = document.getElementById('fileChip');
+const connLed = document.getElementById('connLed');
+const awaitBanner = document.getElementById('awaitBanner');
+
+let ws = null;
+let thinkingEl = null;
+let currentPanel = null;     // ONE activity panel per user turn (holds all tool attempts)
+let currentSecPre = null;    // <pre> of the tool section currently streaming
+let currentSec = null;       // the tool section element currently streaming
+let stepCount = 0;           // tool attempts in the current turn
+let turnToolNames = [];      // tool name(s) used this turn (for the collapsed header)
+let pendingResults = [];     // [{sql?, database?, headers, rows}] shown in the reply
+let pendingSqlPair = null;   // most recent query, waiting to pair with its table
+let pendingFile = null;
+let awaitingAnswer = false;
+
+fetch('/config').then(r => r.json()).then(c => {
+  const el = document.getElementById('backendLabel');
+  if(el) el.textContent = 'chat console · ' + (c.model || 'model');
+}).catch(() => {});
+
+function scroll(){ chat.scrollTop = chat.scrollHeight; }
+
+/* ---------- markdown (safe subset) ---------- */
+function renderMarkdown(src){
+  const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // inline: code, bold, and *italic* only. NO _underscore_ italic — it corrupts
+  // snake_case identifiers (created_at, CURRENT_DATE, order_total, ...).
+  const inline = s => escHtml(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+
+  const lines = src.replace(/\r/g,'').split('\n');
+  const fence = /^\s*```\s*(\w*)\s*$/;
+  let html = '', list = null, i = 0;
+  const closeList = () => { if(list){ html += `</${list}>`; list = null; } };
+
+  while(i < lines.length){
+    const fm = lines[i].match(fence);
+    if(fm){                                   // fenced code block
+      closeList();
+      const lang = fm[1] || '';
+      const buf = [];
+      i++;
+      while(i < lines.length && !fence.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++;                                    // consume closing fence (or past EOF)
+      const code = escHtml(buf.join('\n'));
+      html += `<div class="codeblock"><div class="cb-head">`
+            + `<span class="cb-lang">${lang || 'code'}</span>`
+            + `<button class="cb-copy" type="button">Copy</button></div>`
+            + `<pre><code>${code}</code></pre></div>`;
+      continue;
+    }
+    const line = lines[i].replace(/\s+$/,'');
+    let m;
+    if((m = line.match(/^\s*[-*]\s+(.*)$/))){
+      if(list !== 'ul'){ closeList(); html += '<ul>'; list='ul'; }
+      html += `<li>${inline(m[1])}</li>`;
+    } else if((m = line.match(/^\s*(\d+)[.)]\s+(.*)$/))){
+      if(list !== 'ol'){ closeList(); html += '<ol>'; list='ol'; }
+      // preserve the model's actual number, so items split by paragraphs don't
+      // all restart at 1 (li value keeps 1,2,3,4 even across separate lists)
+      html += `<li value="${m[1]}">${inline(m[2])}</li>`;
+    } else if(line.trim() === ''){
+      closeList(); html += '<br>';
+    } else {
+      closeList(); html += `<div>${inline(line)}</div>`;
+    }
+    i++;
+  }
+  closeList();
+  return html;
+}
+
+// Attach copy-to-clipboard handlers to any code blocks inside `container`.
+function wireCopyButtons(container){
+  container.querySelectorAll('.cb-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const codeEl = btn.closest('.codeblock').querySelector('pre code');
+      const text = codeEl ? codeEl.textContent : '';
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          await navigator.clipboard.writeText(text);
+        } else { throw new Error('no clipboard api'); }
+      }catch(e){
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try{ document.execCommand('copy'); }catch(_){}
+        document.body.removeChild(ta);
+      }
+      const prev = btn.textContent;
+      btn.textContent = 'Copied!'; btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1400);
+    });
+  });
+}
+
+/* ---------- table element from parsed data ---------- */
+// SQL query block shown in the result bubble (with copy button)
+function buildSqlEl(sql, database){
+  const holder = document.createElement('div');
+  holder.innerHTML = renderMarkdown('```sql\n' + sql + '\n```');
+  const block = holder.firstElementChild;
+  const lang = block.querySelector('.cb-lang');
+  if(lang) lang.textContent = 'sql · ' + (database || 'db');
+  wireCopyButtons(block);
+  return block;
+}
+
+// CSV export for rendered tables
+function tableToCsv(headers, rows){
+  const esc = v => {
+    v = (v ?? '').toString();
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  };
+  return [headers.map(esc).join(','),
+          ...rows.map(r => headers.map((_, c) => esc(r[c])).join(','))].join('\n');
+}
+
+function downloadCsv(headers, rows){
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const blob = new Blob([tableToCsv(headers, rows)], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'table_' + stamp + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+const DISPLAY_CAP = 1000;   // render at most this many rows; CSV always has all
+
+function buildTableEl(headers, rows){
+  const numCol = headers.map((_, c) =>
+    rows.length > 0 && rows.every(r => /^-?\d+$/.test((r[c] ?? '').trim())));
+  const capped = rows.length > DISPLAY_CAP;
+  const shown = capped ? rows.slice(0, DISPLAY_CAP) : rows;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'tablewrap';
+
+  // header bar: row count (+ preview note) + CSV save button (exports ALL rows)
+  const bar = document.createElement('div');
+  bar.className = 'tw-bar';
+  const info = document.createElement('span');
+  info.className = 'tw-info';
+  info.textContent = capped
+    ? (rows.length.toLocaleString() + ' rows · showing first ' + DISPLAY_CAP.toLocaleString() + ' — use CSV for all')
+    : (rows.length + ' row' + (rows.length === 1 ? '' : 's'));
+  const btn = document.createElement('button');
+  btn.className = 'tw-save';
+  btn.type = 'button';
+  btn.textContent = '⬇ CSV';
+  btn.title = 'Save the FULL table (' + rows.length + ' rows) as a .csv file';
+  btn.addEventListener('click', () => downloadCsv(headers, rows));  // full rows
+  bar.appendChild(info); bar.appendChild(btn);
+  wrap.appendChild(bar);
+  const table = document.createElement('table');
+  table.className = 'grid';
+  const thead = document.createElement('thead');
+  const htr = document.createElement('tr');
+  headers.forEach((h, c) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    if(numCol[c]) th.className = 'num';
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr); table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  shown.forEach(r => {
+    const tr = document.createElement('tr');
+    headers.forEach((_, c) => {
+      const td = document.createElement('td');
+      td.textContent = r[c] ?? '';
+      if(numCol[c]) td.className = 'num';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); wrap.appendChild(table);
+  return wrap;
+}
+
+/* ---------- bubbles ---------- */
+function addBubble(cls, text){
+  const row = document.createElement('div');
+  row.className = 'row ' + cls;
+  const b = document.createElement('div');
+  b.className = 'bubble';
+  b.textContent = text;
+  row.appendChild(b);
+  chat.appendChild(row); scroll();
+}
+
+// The assistant result: rendered table(s) from this turn + the model's prose.
+function addResult(results, prose){
+  const row = document.createElement('div');
+  row.className = 'row bot';
+  const b = document.createElement('div');
+  b.className = 'bubble md' + (results.length ? ' wide' : '');
+  // prose FIRST so the model's headings/framing sit above the data they describe
+  const text = (prose || '').trim();
+  if(text && text !== '(no response)'){
+    const p = document.createElement('div');
+    p.className = 'prose';
+    p.innerHTML = renderMarkdown(text);
+    wireCopyButtons(p);
+    b.appendChild(p);
+  } else if(!results.length){
+    b.appendChild(document.createTextNode('(no response)'));
+  }
+  // then each result = the query that worked (optional) followed by its table
+  results.forEach(r => {
+    if(r.sql) b.appendChild(buildSqlEl(r.sql, r.database));
+    b.appendChild(buildTableEl(r.headers, r.rows));
+  });
+  row.appendChild(b);
+  chat.appendChild(row); scroll();
+}
+
+/* ---------- thinking ---------- */
+function showThinking(){
+  removeThinking();
+  thinkingEl = document.createElement('div');
+  thinkingEl.className = 'thinking';
+  thinkingEl.textContent = 'processing ';
+  chat.appendChild(thinkingEl); scroll();
+}
+function removeThinking(){ if(thinkingEl){ thinkingEl.remove(); thinkingEl = null; } }
+
+/* ---------- live console ---------- */
+// Create the single activity panel for this turn (if not already open).
+function ensurePanel(){
+  if(currentPanel) return currentPanel;
+  const wrap = document.createElement('div');
+  wrap.className = 'job';
+  wrap.innerHTML = `
+    <div class="job-inner">
+      <div class="job-head">
+        <div class="dot"></div>
+        <span class="name">working…</span>
+        <span class="state">running…</span>
+        <button class="job-stop" type="button" title="Cancel the running query / skip this attempt">⏹ stop</button>
+        <span class="toggle">▸ show log</span>
+      </div>
+      <div class="job-body"></div>
+    </div>`;
+  chat.appendChild(wrap);
+  const stopBtn = wrap.querySelector('.job-stop');
+  stopBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();                       // don't toggle collapse
+    if(ws && ws.readyState === 1){
+      ws.send(JSON.stringify({type:'cancel'}));
+      stopBtn.disabled = true;
+      stopBtn.textContent = 'stopping…';
+      setTimeout(() => { stopBtn.disabled = false; stopBtn.textContent = '⏹ stop'; }, 3000);
+    }
+  });
+  currentPanel = { el: wrap, body: wrap.querySelector('.job-body') };
+  stepCount = 0;
+  turnToolNames = [];
+  currentSecPre = null;
+  scroll();
+  return currentPanel;
+}
+
+// Begin a new tool section within the panel (one per tool call / retry).
+function startSection(name){
+  removeThinking();
+  ensurePanel();
+  stepCount += 1;
+  if(turnToolNames[turnToolNames.length - 1] !== name) turnToolNames.push(name);
+  const sec = document.createElement('div');
+  sec.className = 'tool-sec';
+  const head = document.createElement('div');
+  head.className = 'sec-head';
+  head.innerHTML = `<span class="sec-name">${name}</span>`
+                 + `<span class="sec-attempt">· attempt ${stepCount}</span>`
+                 + `<span class="sec-status">…</span>`;
+  const pre = document.createElement('pre');
+  sec.appendChild(head); sec.appendChild(pre);
+  currentPanel.body.appendChild(sec);
+  currentSecPre = pre;
+  currentSec = sec;
+  scroll();
+}
+
+function consoleText(text, cls){
+  if(!currentSecPre) startSection('output');
+  const pre = currentSecPre;
+  if(cls){
+    const span = document.createElement('span');
+    span.className = cls; span.textContent = text;
+    pre.appendChild(span);
+  } else {
+    pre.appendChild(document.createTextNode(text));
+  }
+  pre.scrollTop = pre.scrollHeight;
+  scroll();
+}
+
+// Mark the current tool section done/failed (panel stays open until the reply).
+function endSection(ok){
+  if(currentSec){
+    currentSec.classList.add(ok ? 'ok' : 'fail');
+    const st = currentSec.querySelector('.sec-status');
+    if(st) st.textContent = ok ? '✓' : '✗';
+  }
+  currentSecPre = null;
+  currentSec = null;
+}
+
+// Collapse the whole turn panel once the reply arrives.
+function finishPanel(){
+  if(!currentPanel) return;
+  const wrap = currentPanel.el;
+  const anyFail = wrap.querySelector('.tool-sec.fail') !== null;
+  wrap.classList.add('collapsible', anyFail ? 'done' : 'done');
+  const uniqueTools = [...new Set(turnToolNames)];
+  wrap.querySelector('.name').textContent =
+    (uniqueTools.length === 1)
+      ? uniqueTools[0] + (stepCount > 1 ? ` · ${stepCount} attempts` : '')
+      : stepCount + ' steps';
+  wrap.querySelector('.state').textContent = 'done';
+  const sb = wrap.querySelector('.job-stop');
+  if(sb) sb.remove();
+  const toggle = wrap.querySelector('.toggle');
+  const head = wrap.querySelector('.job-head');
+  const setLabel = () =>
+    toggle.textContent = wrap.classList.contains('collapsed') ? '▸ show log' : '▾ hide log';
+  head.addEventListener('click', () => { wrap.classList.toggle('collapsed'); setLabel(); });
+  wrap.classList.add('collapsed');   // all attempts tuck away once the answer is ready
+  setLabel();
+  currentPanel = null;
+  currentSecPre = null;
+  currentSec = null;
+  scroll();
+}
+
+
+/* ---------- credential prompts -------------------------------------------
+   Passcodes go over their OWN message type ('answer'), never the chat
+   channel: an answer that arrived as a normal message used to become a chat
+   turn and get sent to the model. They are never echoed into the log either. */
+let credCards = [];
+
+/* A short label for the card, guessed from the prompt a script printed. */
+function credTitleFor(prompt){
+  const p = (prompt || '').toLowerCase();
+  if(p.includes('passcode') || p.includes('otp') ||
+     p.includes('2fa') || p.includes('mfa'))   return 'Passcode';
+  if(p.includes('token'))                      return 'Token';
+  if(p.includes('api key') || p.includes('apikey')) return 'API key';
+  if(p.includes('passphrase'))                 return 'Passphrase';
+  if(p.includes('password'))                   return 'Password';
+  if(p.includes('username') || p.includes('user name') ||
+     p.includes('login'))                      return 'Username';
+  return 'Credential';
+}
+
+function showCredPrompt(prompt){
+  const card = document.createElement('div');
+  card.className = 'credcard';
+  const inner = document.createElement('div');
+  inner.className = 'cc-in';
+  inner.innerHTML = `
+    <div class="cc-top">
+      <span class="cc-lock">&#128274;</span>
+      <span class="cc-title"></span>
+      <span class="cc-tag">MASKED</span>
+    </div>
+    <div class="cc-prompt"></div>
+    <div class="cc-row">
+      <input type="password" autocomplete="off" spellcheck="false">
+      <button class="cc-eye" type="button" title="Show / hide">&#128065;</button>
+      <button class="cc-go" type="button">Submit</button>
+    </div>
+    <div class="cc-note">&#8629; to submit &middot; not written to disk &middot; not sent to the AI model</div>`;
+  card.appendChild(inner);
+  inner.querySelector('.cc-title').textContent = credTitleFor(prompt);
+  inner.querySelector('.cc-prompt').textContent = (prompt || '').trim();
+
+  const input = inner.querySelector('input');
+  const eye   = inner.querySelector('.cc-eye');
+  const go    = inner.querySelector('.cc-go');
+
+  function submit(){
+    const val = input.value;
+    if(!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({type:'answer', text: val}));
+    input.value = '';                                  // drop it from the DOM
+    inner.innerHTML = '';
+    const done = document.createElement('div');
+    done.className = 'cc-done';
+    done.innerHTML = '<span class="tick">&#10003;</span>'
+      + '<span>' + credTitleFor(prompt) + ' &middot; submitted</span>';
+    inner.appendChild(done);
+    card.dataset.done = '1';
+    setAwaiting(false);
+    msgBox.focus();
+  }
+
+  eye.onclick = () => { input.type = input.type === 'password' ? 'text' : 'password';
+                        input.focus(); };
+  go.onclick  = submit;
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); submit(); }
+  });
+
+  chat.appendChild(card);
+  credCards.push(card);
+  scroll();
+  setTimeout(() => input.focus(), 30);
+}
+
+/* Once the job finishes, the submitted cards have served their purpose --
+   clear them so the transcript keeps only the result. */
+function clearCredCards(){
+  credCards.forEach(c => {
+    c.classList.add('gone');
+    setTimeout(() => { if(c.parentNode) c.parentNode.removeChild(c); }, 260);
+  });
+  credCards = [];
+}
+
+/* ---------- awaiting-answer ---------- */
+function setAwaiting(v){
+  awaitingAnswer = v;
+  awaitBanner.style.display = v ? 'block' : 'none';
+  msgBox.placeholder = v ? 'Type your answer to the job’s question…'
+                         : 'Ask anything — e.g. “list the tables” or “run the disk usage script”';
+}
+
+/* ---------- websocket ---------- */
+function connect(){
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => { if(connLed) connLed.classList.remove('off'); };
+  ws.onclose = () => { if(connLed) connLed.classList.add('off'); setTimeout(connect, 1500); };
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    switch(m.type){
+      case 'thinking':      showThinking(); break;
+      case 'assistant':     removeThinking(); finishPanel(); clearCredCards(); addResult(pendingResults, m.text); pendingResults = []; pendingSqlPair = null; break;
+      case 'error':         removeThinking(); finishPanel(); addBubble('err', m.text); pendingResults = []; pendingSqlPair = null; setAwaiting(false); break;
+      case 'tool_start':    startSection(m.name); break;
+      case 'tool_output':   consoleText(m.text); break;
+      case 'tool_table':
+        if(pendingSqlPair){
+          // SQL results supersede each other: only the LAST query's table is
+          // the answer — discovery probes and earlier attempts stay in the log.
+          pendingResults = pendingResults.filter(r => !r.sql);
+          pendingResults.push(Object.assign({}, pendingSqlPair, {headers:m.headers, rows:m.rows}));
+          pendingSqlPair = null;
+        } else {
+          pendingResults.push({headers:m.headers, rows:m.rows});  // fixed tools accumulate
+        }
+        break;
+      case 'tool_sql':      pendingSqlPair = {sql:m.sql, database:m.database}; break; // paired with the NEXT table; failed queries emit no table
+      case 'tool_question':
+        if(m.secret){ showCredPrompt(m.text); }        // never touches the log
+        else { consoleText(m.text, 'qline'); setAwaiting(true); }
+        break;
+      case 'answer_ack':    break;                      // server confirmed receipt
+      case 'tool_end':      endSection(m.ok); setAwaiting(false); clearCredCards(); break;
+    }
+  };
+}
+connect();
+
+/* show the live backend in the header */
+fetch('/config').then(r => r.json()).then(c => {
+  const el = document.getElementById('backendLabel');
+  if(!el) return;
+  const bits = [c.provider || '', c.model || ''].filter(Boolean).join(' \u00b7 ');
+  el.textContent = bits || 'not configured';
+  el.title = (c.backend || '') + (c.fallback ? ('  (fallback: ' + c.fallback + ')') : '');
+}).catch(() => {});
+
+/* ---------- sending ---------- */
+function send(){
+  let text = msgBox.value.trim();
+  if(!text || !ws || ws.readyState !== 1) return;
+
+  if(awaitingAnswer){
+    consoleText(' ' + text + '\n', 'aline');   // answer echoes into the live log
+    setAwaiting(false);
+  } else {
+    addBubble('user', text);
+    if(pendingFile){
+      text += `\n\n[system note: user uploaded a file saved at path "${pendingFile.path}" (original name: ${pendingFile.name})]`;
+      pendingFile = null; fileChip.textContent = '';
+    }
+  }
+  ws.send(JSON.stringify({type:'user', text}));
+  msgBox.value = ''; msgBox.style.height = 'auto';
+}
+
+sendBtn.onclick = send;
+msgBox.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); }
+});
+msgBox.addEventListener('input', () => {
+  msgBox.style.height = 'auto';
+  msgBox.style.height = Math.min(msgBox.scrollHeight, 160) + 'px';
+});
+
+attachBtn.onclick = () => fileInput.click();
+fileInput.onchange = async () => {
+  const f = fileInput.files[0];
+  if(!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  fileChip.textContent = 'uploading ' + f.name + '…';
+  try{
+    const r = await fetch('/upload', {method:'POST', body:fd});
+    const j = await r.json();
+    pendingFile = j;
+    fileChip.textContent = '⎘ attached: ' + j.name + ' — will be included with your next message';
+  }catch(e){ fileChip.textContent = 'upload failed: ' + e; }
+  fileInput.value = '';
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "main": {
+    "kind": "postgres",
+    "host": "db.example.com",
+    "port": 5432,
+    "database": "analytics",
+    "user": "readonly_user",
+    "password": "REPLACE_ME",
+    "description": "Main reporting database"
+  },
+  "warehouse": {
+    "kind": "synapse",
+    "host": "myworkspace.sql.azuresynapse.net",
+    "port": 1433,
+    "database": "sqlpool1",
+    "user": "readonly_user",
+    "password": "REPLACE_ME",
+    "driver": "ODBC Driver 18 for SQL Server",
+    "description": "Azure Synapse dedicated SQL pool"
+  }
+}

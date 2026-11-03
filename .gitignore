@@ -1,0 +1,35 @@
+# --- secrets: never commit these -------------------------------------------
+.env
+.env.*
+!.env.example
+connections.json
+*.pem
+*.key
+.combined-ca-bundle.pem
+
+# --- runtime ---------------------------------------------------------------
+uploads/
+logs/
+*.log
+
+# --- your own scripts ------------------------------------------------------
+# Scripts you drop in scripts/ are yours. The examples are tracked; anything
+# else is ignored by default so you can't accidentally publish an internal
+# runbook. Delete these three lines if you WANT to version your scripts.
+scripts/*
+!scripts/README.md
+!scripts/examples/
+
+# --- python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.myvenv/
+*.egg-info/
+.pytest_cache/
+
+# --- os / editor -----------------------------------------------------------
+.DS_Store
+.vscode/
+.idea/
